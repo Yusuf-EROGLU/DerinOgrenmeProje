@@ -32,22 +32,50 @@ public class CostEpoch_XYLineChart_AWT extends ApplicationFrame {
 		final XYPlot plot = xylineChart.getXYPlot();
 
 		setContentPane(chartPanel);
-		
+
 	}
 
 	private XYDataset createDataset(int numberOfEpoch, int sens, double[] series1, double[] series2) {
 		final XYSeries meanSquar = new XYSeries("Mean Square Cost");
-		for (int i = 0; i < numberOfEpoch; i++) {
-			if (i % sens == 0) {
-				meanSquar.add(i, series1[i]);
+
+		int size1 = series1.length / sens;
+		int size2 = series2.length / sens;
+
+		double[] tempseries1 = new double[size1];
+		double[] tempseries2 = new double[size2];
+
+		for (int i = 0; i < size1; i++) {
+			double temp = 0;
+			for (int j = i*sens; j < i*sens + sens; j++) {
+				temp += series1[j];
 			}
+			tempseries1[i] = temp / sens;
+		}
+		
+		
+
+		for (int i = 0; i < size2; i++) {
+			double temp = 0;
+			for (int j = i*sens; j < i*sens + sens; j++) {
+				temp += series2[j];
+			}
+			tempseries2[i] = temp / sens;
+		}
+		
+
+		
+		for (int i = 0; i < numberOfEpoch/sens; i++) {
+			
+				meanSquar.add((i+1)*sens, tempseries1[i]);
+			
 		}
 
 		final XYSeries crossEntropy = new XYSeries("Cross Entropy");
-		for (int i = 0; i < numberOfEpoch; i++) {
-			if (i % sens == 0) {
-				crossEntropy.add(i, series2[i]);
-			}
+
+		for (int i = 0; i < numberOfEpoch/sens; i++) {
+			
+				crossEntropy.add((i+1)*sens, tempseries2[i]);
+		
 		}
 
 		final XYSeriesCollection dataset = new XYSeriesCollection();

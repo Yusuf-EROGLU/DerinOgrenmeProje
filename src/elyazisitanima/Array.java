@@ -68,9 +68,7 @@ public class Array {
 		return a + uniform() * (b - a);
 	}
 
-	public static double[] random(int m, double x, double y) // x ile y arasýnda uniform daðýlan m boyutunda dizi
-																// üretir.
-	{
+	public static double[] random(int m, double x, double y) {
 		double[] a = new double[m];
 		for (int i = 0; i < m; i++) {
 			a[i] = uniform(x, y);
@@ -124,7 +122,35 @@ public class Array {
 		}
 		return c;
 	}
+	public static double[] add(double[] a, double[] b) {
+		int m = a.length;
+		
+		double[] c = new double[m];
+		for (int i = 0; i < m; i++) {
+			
+				c[i] = a[i] + b[i];
+			
+		}
+		return c;
+	}
 
+	public static double[][][] add(double[][][] a, double[][][] b) {
+		int m = a.length;
+		int n = a[0].length;
+		int o = a[0][0].length;
+		
+		double[][][] c = new double[m][n][o];
+		
+		for (int i = 0; i < m; i++) {
+			for (int j = 0; j < n; j++) {
+				for (int k = 0; k < o; k++) {
+					c[i][j][k] = a[i][j][k] + b[i][j][k];
+				}
+			}
+		}
+		return c;
+	}
+	
 	public static double[][] add(double[][] a, double[] b) {
 		int m = a.length;
 		int n = a[0].length;

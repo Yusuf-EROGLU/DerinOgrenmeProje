@@ -10,6 +10,7 @@ public class MLNNetwork {
 	private double learningRate; //
 	private int numberOfEpoch; // Epoch sayýsý
 	private int miniBatchSize; // mini-batch boyutu
+	private int numberOfSampleInOneCycle;
 	private double cost;
 
 	private MNISTReader test;
@@ -46,9 +47,9 @@ public class MLNNetwork {
 	private double[] deltaOutputLayerBias;
 
 	private double accuracy;
-	private int[] numTrueByClass ;
+	private int[] numTrueByClass;
 
-	private int[] numFalseByClass ;
+	private int[] numFalseByClass;
 	private double[] costCrossEntropy;
 	private double[] costMeanSqr;
 
@@ -61,6 +62,7 @@ public class MLNNetwork {
 		this.numberOfOutputNode = numberOfOutputNode;
 		this.learningRate = learningRate;
 		this.numberOfEpoch = numberOfEpoch;
+		this.numberOfSampleInOneCycle = 1;
 		this.miniBatchSize = miniBatchSize;
 		this.test = test;
 		this.training = training;
@@ -81,10 +83,10 @@ public class MLNNetwork {
 		bias = Array.random(numberOfLayer + 1, numberOfHiddenNode, 0.0, 2.0);
 		outputBias = Array.random(numberOfOutputNode, 0.0, 2.0);
 
-		sumValues = new double[numberOfLayer + 1][miniBatchSize][numberOfHiddenNode];
-		activatedValues = new double[numberOfLayer + 1][miniBatchSize][numberOfHiddenNode];
-		outLSumValues = new double[miniBatchSize][numberOfOutputNode];
-		outLActivatedValues = new double[miniBatchSize][numberOfOutputNode];
+		sumValues = new double[numberOfLayer + 1][numberOfSampleInOneCycle][numberOfHiddenNode];
+		activatedValues = new double[numberOfLayer + 1][numberOfSampleInOneCycle][numberOfHiddenNode];
+		outLSumValues = new double[numberOfSampleInOneCycle][numberOfOutputNode];
+		outLActivatedValues = new double[numberOfSampleInOneCycle][numberOfOutputNode];
 
 		hiddenWeights = Array.random(numberOfLayer, numberOfHiddenNode, numberOfHiddenNode, 0.0, 1.0);
 		inputWeights = Array.random(numberOfInputNode, numberOfHiddenNode, 0.0, 1.0);
@@ -93,18 +95,15 @@ public class MLNNetwork {
 		deltaOfHiddenWeights = new double[numberOfLayer][numberOfHiddenNode][numberOfHiddenNode];
 		deltaOfInputWeights = new double[numberOfInputNode][numberOfHiddenNode];
 		deltaOfOutputWeights = new double[numberOfHiddenNode][numberOfOutputNode];
+		deltaOfBias = new double[numberOfLayer+1][numberOfHiddenNode];
+		deltaOutputLayerBias = new double[numberOfOutputNode];
 
 		inputs = training.getNormalizedImageData();
-		desiredOutputs = training.getFormatedLabelData(); // label data da integer labe deðerleri var 1,2,3,4 gibi onun
-															// yerine -0000000010-,-0001000000- gibi nn de kullanýlacak
-															// verileri aldýk
-		// numberOfEpoch = (int) inputs.length / miniBatchSize;//tüm verileri eðitimde
-		// bir
-		// kere kullanabilmek için
+		desiredOutputs = training.getFormatedLabelData();
 
-		localGradyanOfHiddenWeights = new double[numberOfLayer][miniBatchSize][numberOfHiddenNode][numberOfHiddenNode];
-		localGradyanOfInputWeights = new double[numberOfInputNode][miniBatchSize][numberOfHiddenNode];
-		localGradyanOfOutputWeights = new double[numberOfHiddenNode][miniBatchSize][numberOfOutputNode];
+		localGradyanOfHiddenWeights = new double[numberOfLayer][numberOfSampleInOneCycle][numberOfHiddenNode][numberOfHiddenNode];
+		localGradyanOfInputWeights = new double[numberOfInputNode][numberOfSampleInOneCycle][numberOfHiddenNode];
+		localGradyanOfOutputWeights = new double[numberOfHiddenNode][numberOfSampleInOneCycle][numberOfOutputNode];
 
 		costCrossEntropy = new double[numberOfEpoch];
 		costMeanSqr = new double[numberOfEpoch];
@@ -116,116 +115,88 @@ public class MLNNetwork {
 		double[][] tempInput;
 		double[][] tempDOutput;
 
-		// = new double[miniBatchSize][desiredOutputs[0].length];
-
 		for (int i = 0; i < numberOfEpoch; i++) {
-			tempInput = Array.partialCopy(inputs, (i * miniBatchSize) % 60000, miniBatchSize);
-			tempDOutput = Array.partialCopy(desiredOutputs, (i * miniBatchSize) % 60000, miniBatchSize);
+			tempInput = Array.partialCopy(inputs, (i * numberOfSampleInOneCycle) % 60000, numberOfSampleInOneCycle);
+			tempDOutput = Array.partialCopy(desiredOutputs, (i * numberOfSampleInOneCycle) % 60000,
+					numberOfSampleInOneCycle);
 
-			if (i != 0) {
-				sumValues = new double[numberOfLayer + 1][miniBatchSize][numberOfHiddenNode];
-				activatedValues = new double[numberOfLayer + 1][miniBatchSize][numberOfHiddenNode];
-				outLSumValues = new double[miniBatchSize][numberOfOutputNode];
-				outLActivatedValues = new double[miniBatchSize][numberOfOutputNode];
+			for (int b = 0; b < miniBatchSize; b++) {
 
-				deltaOfHiddenWeights = new double[numberOfLayer][numberOfHiddenNode][numberOfHiddenNode];
-				deltaOfInputWeights = new double[numberOfInputNode][numberOfHiddenNode];
-				deltaOfOutputWeights = new double[numberOfHiddenNode][numberOfOutputNode];
-
-				localGradyanOfHiddenWeights = new double[numberOfLayer][miniBatchSize][numberOfHiddenNode][numberOfHiddenNode];
-				localGradyanOfInputWeights = new double[numberOfInputNode][miniBatchSize][numberOfHiddenNode];
-				localGradyanOfOutputWeights = new double[numberOfHiddenNode][miniBatchSize][numberOfOutputNode];
-
-				deltaOfBias = new double[numberOfLayer + 1][numberOfHiddenNode];
-				deltaOutputLayerBias = new double[numberOfOutputNode];
-			}
-
-			if (i == 0) {
-				System.out.println("ilk epoch forward propagation basladý");
-			}
-
-			// FORWARD PROPAGATION
-
-			// input layer FP
-			sumValues[0] = Array.add(Array.dot(tempInput, inputWeights), bias[0]);
-			activatedValues[0] = Array.sigmoid(sumValues[0]);
-
-			if (i == 0) {
-				System.out.println("ilk epoch inputlayer deðerleri hesaplandý");
-			}
-
-			// hidden layers FP
-			for (int j = 1; j <= numberOfLayer; j++) {
-				sumValues[j] = Array.add(Array.dot(activatedValues[j - 1], hiddenWeights[j - 1]), bias[j]);
-				activatedValues[j] = Array.sigmoid(sumValues[j]);
-			}
-
-			if (i == 0) {
-				System.out.println("ilk epoch hidden layer deðerleri hesaplandý");
-			}
-
-			// output layer FP
-			outLSumValues = Array.add(Array.dot(activatedValues[numberOfLayer], outputWeights), outputBias);
-			// outLActivatedValues = Array.softmax(outLSumValues);
-			outLActivatedValues = Array.sigmoid(outLSumValues);
-
-			if (i == 0) {
-				System.out.println("ilk forward propagation tamamlandý");
-			}
-
-			costCrossEntropy[i] = Array.cross_entropy(miniBatchSize, tempDOutput, outLActivatedValues);
-			costMeanSqr[i] = Array.costMeanSq(tempDOutput, outLActivatedValues);
-
-			cost = Array.cross_entropy(miniBatchSize, tempDOutput, outLActivatedValues);
-			// cost = Array.costMeanSq(tempDOutput, outLActivatedValues);
-
-			if (i % 1 == 0) {
-				System.out.println((i + 1) + ". epoch cost deðeri :" + cost);
-			}
-			if (cost < 1) {
-
-				for (int y = 0; y < 10; y++) {
-					System.out.print(this.outLActivatedValues[0][y] + "     ,");
+				if (i == 0) {
+					System.out.println("ilk epoch forward propagation basladý");
 				}
-				System.out.println("");
-				for (int y = 0; y < 10; y++) {
-					System.out.print(tempDOutput[0][y] + "     ,");
+
+				// FORWARD PROPAGATION
+
+				// input layer FP
+				sumValues[0] = Array.add(Array.dot(tempInput, inputWeights), bias[0]);
+				activatedValues[0] = Array.sigmoid(sumValues[0]);
+
+				if (i == 0) {
+					System.out.println("ilk epoch inputlayer deðerleri hesaplandý");
 				}
-				System.out.println("");
-				System.out.println("-------------------------------------------");
-			}
 
-			// BACK PROPAGATION
+				// hidden layers FP
+				for (int j = 1; j <= numberOfLayer; j++) {
+					sumValues[j] = Array.add(Array.dot(activatedValues[j - 1], hiddenWeights[j - 1]), bias[j]);
+					activatedValues[j] = Array.sigmoid(sumValues[j]);
+				}
 
-			localGradyanOfOutputWeights = outputGradyanHesapla(numberOfHiddenNode, outLActivatedValues, tempDOutput);
-			if (i == 0) {
-				System.out.println("ilk output gradyaný hesaplandý");
-			}
+				// output layer FP
+				outLSumValues = Array.add(Array.dot(activatedValues[numberOfLayer], outputWeights), outputBias);
+				// outLActivatedValues = Array.softmax(outLSumValues);
+				outLActivatedValues = Array.sigmoid(outLSumValues);
 
-			localGradyanOfHiddenWeights = localGradyanHesapla(numberOfLayer, numberOfLayer, outputWeights,
-					hiddenWeights, localGradyanOfOutputWeights, localGradyanOfHiddenWeights, activatedValues);
-			if (i == 0) {
-				System.out.println("ilk hidden gradyaný hesaplandý");
-			}
+				
+				
+				
+				if (i % 1 == 0) {
+					System.out.println((i + 1) + ". epoch cost deðeri :" + cost);
+				}
 
-			localGradyanOfInputWeights = inputGradyanHesapla(numberOfInputNode, activatedValues, hiddenWeights,
-					localGradyanOfHiddenWeights);
-			if (i == 0) {
-				System.out.println("ilk local gradyanlar hesaplandý");
-			}
+				// BACK PROPAGATION
 
-			deltaOfOutputWeights = deltaOutputHesapla(learningRate, activatedValues[numberOfLayer],
-					localGradyanOfOutputWeights);
-			deltaOfHiddenWeights = deltaHiddenHesapla(learningRate, activatedValues, localGradyanOfHiddenWeights);
-			deltaOfInputWeights = deltaInputHesapla(learningRate, tempInput, localGradyanOfInputWeights);
+				localGradyanOfOutputWeights = outputGradyanHesapla(numberOfHiddenNode, outLActivatedValues,
+						tempDOutput);
 
-			deltaOfBias = deltaOfBiasHesapla(learningRate, localGradyanOfHiddenWeights, localGradyanOfInputWeights,
-					hiddenWeights);
-			deltaOutputLayerBias = deltaOutputLayerBiasHesapla(learningRate, localGradyanOfOutputWeights,
-					outputWeights);
+				localGradyanOfHiddenWeights = localGradyanHesapla(numberOfLayer, numberOfLayer, outputWeights,
+						hiddenWeights, localGradyanOfOutputWeights, localGradyanOfHiddenWeights, activatedValues);
 
-			if (i == 5000) {
-				System.out.println("dededede");
+				localGradyanOfInputWeights = inputGradyanHesapla(numberOfInputNode, activatedValues, hiddenWeights,
+						localGradyanOfHiddenWeights);
+
+				deltaOfOutputWeights = Array.add(deltaOfOutputWeights,
+						deltaOutputHesapla(learningRate, activatedValues[numberOfLayer], localGradyanOfOutputWeights));
+
+				deltaOfHiddenWeights = Array.add(deltaOfHiddenWeights,
+						deltaHiddenHesapla(learningRate, activatedValues, localGradyanOfHiddenWeights));
+
+				deltaOfInputWeights = Array.add(deltaOfInputWeights, deltaInputHesapla(learningRate, tempInput, localGradyanOfInputWeights));
+
+				deltaOfBias = Array.add(deltaOfBias,deltaOfBiasHesapla(learningRate, localGradyanOfHiddenWeights, localGradyanOfInputWeights,
+						hiddenWeights));
+				
+				deltaOutputLayerBias = Array.add(deltaOutputLayerBias, deltaOutputLayerBiasHesapla(learningRate, localGradyanOfOutputWeights,
+						outputWeights));
+
+				if(b == miniBatchSize-1)
+				{
+				costCrossEntropy[i] = Array.cross_entropy(numberOfSampleInOneCycle, tempDOutput, outLActivatedValues);
+				costMeanSqr[i] = Array.costMeanSq(tempDOutput, outLActivatedValues);
+
+				cost = Array.cross_entropy(numberOfSampleInOneCycle, tempDOutput, outLActivatedValues);
+				
+				}
+
+				sumValues = new double[numberOfLayer + 1][numberOfSampleInOneCycle][numberOfHiddenNode];
+				activatedValues = new double[numberOfLayer + 1][numberOfSampleInOneCycle][numberOfHiddenNode];
+				outLSumValues = new double[numberOfSampleInOneCycle][numberOfOutputNode];
+				outLActivatedValues = new double[numberOfSampleInOneCycle][numberOfOutputNode];
+
+				localGradyanOfHiddenWeights = new double[numberOfLayer][numberOfSampleInOneCycle][numberOfHiddenNode][numberOfHiddenNode];
+				localGradyanOfInputWeights = new double[numberOfInputNode][numberOfSampleInOneCycle][numberOfHiddenNode];
+				localGradyanOfOutputWeights = new double[numberOfHiddenNode][numberOfSampleInOneCycle][numberOfOutputNode];
+
 			}
 
 			hiddenWeights = Array.subtract(hiddenWeights, deltaOfHiddenWeights);
@@ -234,19 +205,29 @@ public class MLNNetwork {
 			bias = Array.subtract(bias, deltaOfBias);
 			outputBias = Array.subtract(outputBias, deltaOutputLayerBias);
 
+			deltaOfHiddenWeights = new double[numberOfLayer][numberOfHiddenNode][numberOfHiddenNode];
+			deltaOfInputWeights = new double[numberOfInputNode][numberOfHiddenNode];
+			deltaOfOutputWeights = new double[numberOfHiddenNode][numberOfOutputNode];
+			deltaOfBias = new double[numberOfLayer + 1][numberOfHiddenNode];
+			deltaOutputLayerBias = new double[numberOfOutputNode];
+
 		}
-		sumValues = new double[numberOfLayer + 1][miniBatchSize][numberOfHiddenNode];
-		activatedValues = new double[numberOfLayer + 1][miniBatchSize][numberOfHiddenNode];
-		outLSumValues = new double[miniBatchSize][numberOfOutputNode];
-		outLActivatedValues = new double[miniBatchSize][numberOfOutputNode];
+
+		// test esnasýnda ayný deðiþkenler kullanýldýðýndan problem çýkmamasý için
+		// koydum tekrardan bakýp düzelt belki gerek olmayabilir.
+
+		sumValues = new double[numberOfLayer + 1][numberOfSampleInOneCycle][numberOfHiddenNode];
+		activatedValues = new double[numberOfLayer + 1][numberOfSampleInOneCycle][numberOfHiddenNode];
+		outLSumValues = new double[numberOfSampleInOneCycle][numberOfOutputNode];
+		outLActivatedValues = new double[numberOfSampleInOneCycle][numberOfOutputNode];
 
 		deltaOfHiddenWeights = new double[numberOfLayer][numberOfHiddenNode][numberOfHiddenNode];
 		deltaOfInputWeights = new double[numberOfInputNode][numberOfHiddenNode];
 		deltaOfOutputWeights = new double[numberOfHiddenNode][numberOfOutputNode];
 
-		localGradyanOfHiddenWeights = new double[numberOfLayer][miniBatchSize][numberOfHiddenNode][numberOfHiddenNode];
-		localGradyanOfInputWeights = new double[numberOfInputNode][miniBatchSize][numberOfHiddenNode];
-		localGradyanOfOutputWeights = new double[numberOfHiddenNode][miniBatchSize][numberOfOutputNode];
+		localGradyanOfHiddenWeights = new double[numberOfLayer][numberOfSampleInOneCycle][numberOfHiddenNode][numberOfHiddenNode];
+		localGradyanOfInputWeights = new double[numberOfInputNode][numberOfSampleInOneCycle][numberOfHiddenNode];
+		localGradyanOfOutputWeights = new double[numberOfHiddenNode][numberOfSampleInOneCycle][numberOfOutputNode];
 
 		deltaOfBias = new double[numberOfLayer + 1][numberOfHiddenNode];
 		deltaOutputLayerBias = new double[numberOfOutputNode];
@@ -297,7 +278,6 @@ public class MLNNetwork {
 		}
 		accuracy = numCorClass / 10000;
 
-		
 	}
 
 	public String classifyMNIST(double[] sample) {
@@ -307,7 +287,7 @@ public class MLNNetwork {
 		activatedValues = new double[numberOfLayer + 1][1][numberOfHiddenNode];
 		outLSumValues = new double[1][numberOfOutputNode];
 		outLActivatedValues = new double[1][numberOfOutputNode];
-		
+
 		for (int i = 0; i < sample.length; i++) {
 			tempInput[0][i] = sample[i];
 		}
@@ -330,7 +310,6 @@ public class MLNNetwork {
 		outLSumValues = Array.add(Array.dot(activatedValues[numberOfLayer], outputWeights), outputBias);
 		outLActivatedValues = Array.softmax(outLSumValues);
 
-		
 		switch (Array.findMaxValIndex(outLActivatedValues[0])) {
 		case 0:
 			return "0";
@@ -353,7 +332,7 @@ public class MLNNetwork {
 		case 9:
 			return "9";
 		}
-		return "---";	
+		return "---";
 	}
 
 	private double[][] deltaOfBiasHesapla(double learnRate, double[][][][] locGradHid, double[][][] locGradIn,
@@ -563,7 +542,7 @@ public class MLNNetwork {
 	public int getNumberOfEpoch() {
 		return numberOfEpoch;
 	}
-	
+
 	public int[] getNumTrueByClass() {
 		return numTrueByClass;
 	}
